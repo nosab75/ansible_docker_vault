@@ -1,0 +1,74 @@
+---
+- name: Installer Docker et exécuter une image Apache2
+  hosts: all
+  become: true
+  vars_files:
+   - files/secrets/credentials.yml
+  vars:
+    default_container_name: apache2-test
+    default_container_image: ubuntu/apache2
+    httpd_port: 8080
+
+  tasks:
+    - name: Install aptitude
+      apt:
+        name: aptitude
+        state: latest
+        update_cache: true
+
+    - name: Install required system packages
+      apt:
+        pkg: "{{ item }}"
+        state: latest
+      loop:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - virtualenv
+          - python3-setuptools
+          - git
+          - htop
+          - net-tools
+          - lynx
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      apt:
+        name: docker-ce
+        state: latest
+        update_cache: true
+
+    - name: Install Docker Module for Python
+      pip:
+        name: docker
+   
+    - name: Copy website file template
+      template:
+        src: index.html.j2
+        dest: /home/vagrant/index.html
+
+    - name: Pull default Docker image
+      community.docker.docker_image:
+        name: "{{ default_container_image }}"
+        source: pull
+
+    - name: Create default containers
+      community.docker.docker_container:
+        name: "{{ default_container_name }}"
+        image: "{{ default_container_image }}"
+        state: started
+        ports:
+          - "{{ httpd_port }}:80"
+        volumes:
+          - /home/vagrant/index.html:/var/www/html/index.html
